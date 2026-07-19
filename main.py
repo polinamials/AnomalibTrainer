@@ -8,6 +8,13 @@ from PySide6.QtQuickControls2 import QQuickStyle
 from Backend import Backend
 
 
+if len(sys.argv) > 1 and sys.argv[1] == "--training-process":
+    from training_process import main as run_training
+
+    run_training(sys.argv[2:])
+    sys.exit(0)
+
+
 if __name__ == "__main__":
     QQuickStyle.setStyle("Material")
     app = QGuiApplication(sys.argv)

@@ -44,9 +44,13 @@ class TrainingWorker(QObject):
             self.canceled.emit()
             return
 
+        entry_point = (
+            [sys.executable, "--training-process"]
+            if "__compiled__" in globals()
+            else [sys.executable, str(Path(__file__).with_name("training_process.py"))]
+        )
         command = [
-            sys.executable,
-            str(Path(__file__).with_name("training_process.py")),
+            *entry_point,
             str(self.model_config),
             str(self.results_dir),
             *self._settings_arguments(),

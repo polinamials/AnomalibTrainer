@@ -3,6 +3,7 @@
 import sys
 from pathlib import Path
 
+import yaml
 from anomalib.data import Folder
 from anomalib.engine import Engine
 
@@ -38,6 +39,16 @@ def main(arguments):
     )
     model.visualizer = False
     engine.train(model=model, datamodule=datamodule)
+
+    latest = Path(results_dir) / model.__class__.__name__ / data_name / "latest"
+    if latest.exists():
+        metadata_path = latest.resolve() / "training_metadata.yaml"
+        with metadata_path.open("w", encoding="utf-8") as metadata_file:
+            yaml.safe_dump(
+                {"dataset": data_name, "data_root": str(Path(root_path).resolve())},
+                metadata_file,
+                sort_keys=False,
+            )
 
 
 if __name__ == "__main__":

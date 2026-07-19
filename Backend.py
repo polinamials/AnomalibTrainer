@@ -140,6 +140,14 @@ class Backend(QObject):
         data = config.get("data", {})
         data_args = data.get("init_args", data) if isinstance(data, dict) else {}
         data_root = data_args.get("root", "") if isinstance(data_args, dict) else ""
+        metadata_path = version_path / "training_metadata.yaml"
+        if metadata_path.exists():
+            with metadata_path.open(encoding="utf-8") as metadata_file:
+                metadata = yaml.safe_load(metadata_file) or {}
+            data_root = metadata.get("data_root", data_root)
+        elif self._settings.value("training/dataset", "", type=str) == dataset_dir.name:
+            # Compatibility for runs created before per-run metadata was saved.
+            data_root = self._settings.value("training/rootPath", data_root, type=str)
         export_path = (
             version_path / "export" / "weights" / "onnx"
             / f"{model_dir.name}-{dataset_dir.name}.onnx"
