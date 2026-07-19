@@ -109,10 +109,6 @@ class Backend(QObject):
     def selectedModelPath(self):
         return self._selected("path")
 
-    @Property(str, notify=selectedModelChanged)
-    def selectedModelConfig(self):
-        return self._selected("config")
-
     def _load_available_models(self):
         for config_path in MODELS_DIR.glob("*.yaml"):
             with config_path.open(encoding="utf-8") as config_file:
@@ -138,11 +134,9 @@ class Backend(QObject):
         checkpoints = list(version_path.rglob("*.ckpt"))
         if not config_path.exists() or not checkpoints:
             return None
-        config_text = "Config file was not produced."
         created_path = config_path if config_path.exists() else version_path
-        if config_path.exists():
-            config_text = config_path.read_text(encoding="utf-8")
-        config = yaml.safe_load(config_text) or {}
+        with config_path.open(encoding="utf-8") as config_file:
+            config = yaml.safe_load(config_file) or {}
         data = config.get("data", {})
         data_args = data.get("init_args", data) if isinstance(data, dict) else {}
         data_root = data_args.get("root", "") if isinstance(data_args, dict) else ""
@@ -161,7 +155,6 @@ class Backend(QObject):
             ),
             "path": str(version_path),
             "dataset_path": str(dataset_dir),
-            "config": config_text,
             "data_root": str(data_root),
             "config_path": str(config_path),
             "checkpoint_path": str(max(checkpoints, key=lambda path: path.stat().st_mtime)),
@@ -243,7 +236,6 @@ class Backend(QObject):
             "status": "training",
             "created": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "path": "",
-            "config": "Training in progress…",
             "data_root": root_path,
         }
         self._trained_models.upsert(display_name, "training")
@@ -355,7 +347,6 @@ class Backend(QObject):
         details = self._model_details.get(name)
         if details:
             details["status"] = "failed"
-            details["config"] = f"Training failed:\n{error}"
             self._trained_models.upsert(name, "failed")
 
     @Slot(str)
@@ -413,7 +404,6 @@ class Backend(QObject):
         details = self._model_details.get(name)
         if details:
             details["status"] = details.pop("status_before_export", "trained")
-            details["config"] += f"\n\nONNX export failed:\n{error}"
             self._trained_models.upsert(name, details["status"])
 
     @Slot(str)

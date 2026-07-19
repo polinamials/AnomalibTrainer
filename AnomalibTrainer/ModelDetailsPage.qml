@@ -23,15 +23,12 @@ Page {
                         + backend.selectedModelStatus.slice(1) : ""
             }
             Label { text: "Dataset"; font.bold: true }
-            RowLayout {
-                Label { text: backend.selectedModelDataset }
-                Label {
-                    visible: backend.selectedModelDataRoot.length > 0
-                    text: "— " + backend.selectedModelDataRoot
-                    opacity: 0.7
-                    elide: Text.ElideMiddle
-                    Layout.maximumWidth: 520
-                }
+            Label {
+                text: backend.selectedModelDataset
+                      + (backend.selectedModelDataRoot.length > 0
+                         ? " (" + backend.selectedModelDataRoot + ")" : "")
+                elide: Text.ElideMiddle
+                Layout.maximumWidth: 600
             }
             Label { text: "Version"; font.bold: true }
             Label { text: backend.selectedModelVersion }
@@ -40,17 +37,6 @@ Page {
             Label { text: "Location"; font.bold: true }
             Label { text: backend.selectedModelPath; wrapMode: Text.WrapAnywhere; Layout.fillWidth: true }
         }
-        Label { text: "Configuration"; font.bold: true; font.pixelSize: 18 }
-        ScrollView {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            TextArea {
-                text: backend.selectedModelConfig
-                readOnly: true
-                selectByMouse: true
-                wrapMode: TextEdit.NoWrap
-                font.family: "monospace"
-            }
-        }
+        Item { Layout.fillHeight: true }
     }
 }
