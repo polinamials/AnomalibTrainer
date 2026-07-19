@@ -1,6 +1,6 @@
 anomalib==2.5.1
 onnx>=1.16
 PySide6>=6.8
-PyYAML>=6.0
+PyYAML
 torch==2.13.0+cu126
 torchvision==0.28.0+cu126
