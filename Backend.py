@@ -1,5 +1,6 @@
 from datetime import datetime
 from pathlib import Path
+import shutil
 
 import yaml
 from PySide6.QtCore import (
@@ -159,6 +160,7 @@ class Backend(QObject):
                 "%Y-%m-%d %H:%M"
             ),
             "path": str(version_path),
+            "dataset_path": str(dataset_dir),
             "config": config_text,
             "data_root": str(data_root),
             "config_path": str(config_path),
@@ -246,6 +248,7 @@ class Backend(QObject):
             "seed": seed,
         }
         thread = QThread(self)
+        thread.setObjectName(display_name)
         worker = TrainingWorker(
             self._model_files[model_name], RESULTS_DIR, settings
         )
@@ -253,15 +256,23 @@ class Backend(QObject):
         thread.started.connect(worker.run)
         worker.finished.connect(lambda: self.trainingCompleted.emit(display_name))
         worker.failed.connect(lambda error: self.trainingFailed.emit(display_name, error))
+        worker.finished.connect(worker.deleteLater)
+        worker.failed.connect(worker.deleteLater)
         worker.finished.connect(thread.quit)
         worker.failed.connect(thread.quit)
         worker.canceled.connect(lambda: self.trainingCanceled.emit(display_name))
+        worker.canceled.connect(worker.deleteLater)
         worker.canceled.connect(thread.quit)
-        thread.finished.connect(worker.deleteLater)
+        thread.finished.connect(self._training_thread_finished)
         thread.finished.connect(thread.deleteLater)
-        thread.finished.connect(lambda: self._jobs.pop(display_name, None))
         self._jobs[display_name] = (thread, worker)
         thread.start()
+
+    @Slot()
+    def _training_thread_finished(self):
+        thread = self.sender()
+        if thread is not None:
+            self._jobs.pop(thread.objectName(), None)
 
     @Slot(str)
     def cancelTraining(self, name):
@@ -290,12 +301,18 @@ class Backend(QObject):
     @Slot(str)
     def exportModel(self, name):
         details = self._model_details.get(name)
-        if not details or details["status"] != "trained" or name in self._export_jobs:
+        if (
+            not details
+            or details["status"] not in {"trained", "exported"}
+            or name in self._export_jobs
+        ):
             return
+        details["status_before_export"] = details["status"]
         details["status"] = "exporting"
         self._trained_models.upsert(name, "exporting")
 
         thread = QThread(self)
+        thread.setObjectName(name)
         worker = ExportWorker(
             details["config_path"],
             details["checkpoint_path"],
@@ -306,19 +323,27 @@ class Backend(QObject):
         thread.started.connect(worker.run)
         worker.finished.connect(lambda path: self.exportCompleted.emit(name, path))
         worker.failed.connect(lambda error: self.exportFailed.emit(name, error))
+        worker.finished.connect(worker.deleteLater)
+        worker.failed.connect(worker.deleteLater)
         worker.finished.connect(thread.quit)
         worker.failed.connect(thread.quit)
-        thread.finished.connect(worker.deleteLater)
+        thread.finished.connect(self._export_thread_finished)
         thread.finished.connect(thread.deleteLater)
-        thread.finished.connect(lambda: self._export_jobs.pop(name, None))
         self._export_jobs[name] = (thread, worker)
         thread.start()
+
+    @Slot()
+    def _export_thread_finished(self):
+        thread = self.sender()
+        if thread is not None:
+            self._export_jobs.pop(thread.objectName(), None)
 
     @Slot(str, str)
     def _export_finished(self, name, path):
         details = self._model_details.get(name)
         if details:
             details["status"] = "exported"
+            details.pop("status_before_export", None)
             details["export_path"] = path
             self._trained_models.upsert(name, "exported")
 
@@ -326,6 +351,26 @@ class Backend(QObject):
     def _export_failed(self, name, error):
         details = self._model_details.get(name)
         if details:
-            details["status"] = "trained"
+            details["status"] = details.pop("status_before_export", "trained")
             details["config"] += f"\n\nONNX export failed:\n{error}"
-            self._trained_models.upsert(name, "trained")
+            self._trained_models.upsert(name, details["status"])
+
+    @Slot(str)
+    def deleteModel(self, name):
+        details = self._model_details.get(name)
+        if not details or name in self._jobs or name in self._export_jobs:
+            return
+
+        dataset_path_text = details.get("dataset_path", "")
+        if dataset_path_text:
+            dataset_path = Path(dataset_path_text).resolve()
+            results_path = RESULTS_DIR.resolve()
+            try:
+                dataset_path.relative_to(results_path)
+            except ValueError:
+                return
+            if dataset_path != results_path and dataset_path.is_dir():
+                shutil.rmtree(dataset_path)
+
+        self._model_details.pop(name, None)
+        self._trained_models.remove(name)
