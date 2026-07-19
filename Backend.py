@@ -224,6 +224,17 @@ class Backend(QObject):
         if display_name in self._jobs:
             return
 
+        previous_details = self._model_details.get(display_name)
+        previous_details = dict(previous_details) if previous_details else None
+        dataset_dir = RESULTS_DIR / model_name / data_name
+        existing_versions = {
+            str(path.resolve())
+            for path in dataset_dir.iterdir()
+            if dataset_dir.is_dir() and path.name != "latest" and path.is_dir()
+        } if dataset_dir.is_dir() else set()
+        latest = dataset_dir / "latest"
+        previous_latest = str(latest.resolve()) if latest.exists() else ""
+
         self._model_details[display_name] = {
             "name": display_name,
             "model": model_name,
@@ -265,25 +276,74 @@ class Backend(QObject):
         worker.canceled.connect(thread.quit)
         thread.finished.connect(self._training_thread_finished)
         thread.finished.connect(thread.deleteLater)
-        self._jobs[display_name] = (thread, worker)
+        self._jobs[display_name] = {
+            "thread": thread,
+            "worker": worker,
+            "previous": previous_details,
+            "dataset_dir": dataset_dir,
+            "existing_versions": existing_versions,
+            "previous_latest": previous_latest,
+            "cancel_requested": False,
+            "cleanup_done": False,
+        }
         thread.start()
 
     @Slot()
     def _training_thread_finished(self):
         thread = self.sender()
         if thread is not None:
-            self._jobs.pop(thread.objectName(), None)
+            name = thread.objectName()
+            job = self._jobs.get(name)
+            if job and job["cancel_requested"] and not job["cleanup_done"]:
+                self._restore_canceled_training(name, job)
+            self._jobs.pop(name, None)
 
     @Slot(str)
     def cancelTraining(self, name):
         job = self._jobs.get(name)
         if job is not None:
-            job[1].cancel()
+            job["cancel_requested"] = True
+            job["worker"].cancel()
+            self._restore_previous_entry(name, job)
 
     @Slot(str)
     def _training_canceled(self, name):
-        self._model_details.pop(name, None)
-        self._trained_models.remove(name)
+        job = self._jobs.get(name)
+        if job is not None:
+            self._restore_canceled_training(name, job)
+
+    def _restore_previous_entry(self, name, job):
+        previous = job["previous"]
+        if previous:
+            self._model_details[name] = previous
+            self._trained_models.upsert(name, previous["status"])
+        else:
+            self._model_details.pop(name, None)
+            self._trained_models.remove(name)
+
+    def _restore_canceled_training(self, name, job):
+        """Remove only files made by the canceled run and restore the old latest link."""
+        dataset_dir = job["dataset_dir"]
+        if dataset_dir.is_dir():
+            for path in list(dataset_dir.iterdir()):
+                if path.name == "latest" or not path.is_dir():
+                    continue
+                if str(path.resolve()) not in job["existing_versions"]:
+                    shutil.rmtree(path)
+
+            latest = dataset_dir / "latest"
+            if latest.is_symlink():
+                latest.unlink()
+            previous_latest = Path(job["previous_latest"]) if job["previous_latest"] else None
+            if previous_latest and previous_latest.is_dir():
+                latest.symlink_to(previous_latest, target_is_directory=True)
+            try:
+                dataset_dir.rmdir()
+            except OSError:
+                pass
+
+        job["cleanup_done"] = True
+        self._restore_previous_entry(name, job)
 
     @Slot(str)
     def _training_finished(self, name):
@@ -304,6 +364,7 @@ class Backend(QObject):
         if (
             not details
             or details["status"] not in {"trained", "exported"}
+            or name in self._jobs
             or name in self._export_jobs
         ):
             return
