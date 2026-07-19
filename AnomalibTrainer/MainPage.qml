@@ -39,6 +39,9 @@ Page {
             Layout.fillHeight: true
             clip: true
             model: backend.trainedModels
+            ScrollBar.vertical: ScrollBar {
+                policy: ScrollBar.AsNeeded
+            }
 
             Label {
                 anchors.centerIn: parent
