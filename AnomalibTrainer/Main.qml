@@ -4,9 +4,9 @@ import QtQuick.Controls.Material
 
 ApplicationWindow {
     width: 900
-    height: 620
-    minimumWidth: 700
-    minimumHeight: 520
+    height: 680
+    minimumWidth: 780
+    minimumHeight: 640
     visible: true
     title: "Anomalib Trainer"
     Material.theme: Material.System

@@ -43,3 +43,11 @@ class TrainedModelsModel(QAbstractListModel):
         self.beginResetModel()
         self._models = list(models)
         self.endResetModel()
+
+    def remove(self, name):
+        for row, model in enumerate(self._models):
+            if model["name"] == name:
+                self.beginRemoveRows(QModelIndex(), row, row)
+                self._models.pop(row)
+                self.endRemoveRows()
+                return

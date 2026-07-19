@@ -17,9 +17,22 @@ Page {
             columnSpacing: 28
             rowSpacing: 10
             Label { text: "Status"; font.bold: true }
-            Label { text: backend.selectedModelStatus === "trained" ? "Trained" : backend.selectedModelStatus }
+            Label {
+                text: backend.selectedModelStatus.length > 0
+                      ? backend.selectedModelStatus.charAt(0).toUpperCase()
+                        + backend.selectedModelStatus.slice(1) : ""
+            }
             Label { text: "Dataset"; font.bold: true }
-            Label { text: backend.selectedModelDataset }
+            RowLayout {
+                Label { text: backend.selectedModelDataset }
+                Label {
+                    visible: backend.selectedModelDataRoot.length > 0
+                    text: "— " + backend.selectedModelDataRoot
+                    opacity: 0.7
+                    elide: Text.ElideMiddle
+                    Layout.maximumWidth: 520
+                }
+            }
             Label { text: "Version"; font.bold: true }
             Label { text: backend.selectedModelVersion }
             Label { text: "Created"; font.bold: true }
