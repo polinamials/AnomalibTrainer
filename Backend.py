@@ -147,10 +147,10 @@ class Backend(QObject):
         data_root = data_args.get("root", "") if isinstance(data_args, dict) else ""
         export_path = (
             version_path / "export" / "weights" / "onnx"
-            / f"{model_dir.name} — {dataset_dir.name}.onnx"
+            / f"{model_dir.name}-{dataset_dir.name}.onnx"
         )
         return {
-            "name": f"{model_dir.name} — {dataset_dir.name}",
+            "name": f"{model_dir.name}-{dataset_dir.name}",
             "model": model_dir.name,
             "dataset": dataset_dir.name,
             "version": version_path.name,
@@ -218,7 +218,7 @@ class Backend(QObject):
             "workers": workers,
             "seed": seed,
         })
-        display_name = f"{model_name} — {data_name}"
+        display_name = f"{model_name}-{data_name}"
         if display_name in self._jobs:
             return
 

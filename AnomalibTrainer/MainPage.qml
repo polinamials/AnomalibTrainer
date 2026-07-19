@@ -51,7 +51,6 @@ Page {
                     Label {
                         text: modelEntry.name
                         font.pixelSize: 18
-                        font.bold: true
                         Layout.fillWidth: true
                         elide: Text.ElideRight
                     }
