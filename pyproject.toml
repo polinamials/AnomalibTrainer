@@ -1,0 +1,5 @@
+[project]
+name = "PySide QtQuick Project"
+
+[tool.pyside6-project]
+files = ["Backend.py", "AnomalibTrainer/Main.qml", "AnomalibTrainer/MainPage.qml", "AnomalibTrainer/ModelDetailsPage.qml", "AnomalibTrainer/TrainingPage.qml", "AnomalibTrainer/qmldir", "TrainedModelsModel.py", "TrainingWorker.py", "main.py"]

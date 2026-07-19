@@ -1,0 +1,6 @@
+module AnomalibTrainer
+
+Main 1.0 Main.qml
+MainPage 1.0 MainPage.qml
+ModelDetailsPage 1.0 ModelDetailsPage.qml
+TrainingPage 1.0 TrainingPage.qml
