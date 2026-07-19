@@ -58,16 +58,12 @@ Page {
 
                 HoverHandler { cursorShape: Qt.PointingHandCursor }
                 background: Rectangle {
-                    radius: 8
                     color: modelEntry.hovered
                            ? Material.color(Material.BlueGrey, Material.Shade100)
                            : Material.color(Material.BlueGrey, Material.Shade200)
-                    border.width: 1
-                    border.color: Material.color(Material.BlueGrey, Material.Shade500)
                     opacity: Material.theme === Material.Dark ? 0.8 : 0.16
                 }
                 contentItem: RowLayout {
-                    spacing: 12
                     Label {
                         text: modelEntry.name
                         font.pixelSize: 18
