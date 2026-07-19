@@ -32,7 +32,7 @@ Page {
         anchors.fill: parent
         anchors.margins: 32
         spacing: 20
-        Label { text: "Trained Models"; font.pixelSize: 30; font.bold: true }
+        Label { text: "Models"; font.pixelSize: 30; font.bold: true }
 
         ListView {
             Layout.fillWidth: true
@@ -82,6 +82,7 @@ Page {
                               : modelEntry.status === "trained" ? "Trained" : "Failed"
                         color: modelEntry.status === "failed"
                                ? Material.color(Material.Red) : Material.color(Material.Green)
+                        font.pixelSize: 16   
                     }
                     Button {
                         visible: modelEntry.status === "training"
@@ -94,7 +95,7 @@ Page {
                     Button {
                         visible: modelEntry.status !== "training"
                                  && modelEntry.status !== "exporting"
-                        text: "🗑"
+                        text: "×"
                         font.pixelSize: 18
                         ToolTip.visible: hovered
                         ToolTip.text: "Delete model"
