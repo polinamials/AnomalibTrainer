@@ -37,7 +37,6 @@ Page {
         ListView {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: 10
             clip: true
             model: backend.trainedModels
 
@@ -64,6 +63,7 @@ Page {
                     opacity: Material.theme === Material.Dark ? 0.8 : 0.16
                 }
                 contentItem: RowLayout {
+                    spacing: 12
                     Label {
                         text: modelEntry.name
                         font.pixelSize: 18

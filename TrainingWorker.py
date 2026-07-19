@@ -1,9 +1,16 @@
-from threading import Event
+import os
+import signal
+import subprocess
+import sys
+from pathlib import Path
+from threading import Event, Lock
 
 from PySide6.QtCore import QObject, Signal, Slot
 
 
 class TrainingWorker(QObject):
+    """Run Anomalib out of process so cancellation can be immediate and safe."""
+
     finished = Signal()
     failed = Signal(str)
     canceled = Signal()
@@ -14,44 +21,77 @@ class TrainingWorker(QObject):
         self.results_dir = results_dir
         self.dataset_settings = dataset_settings
         self._cancel_requested = Event()
-        self._engine = None
+        self._process = None
+        self._process_lock = Lock()
 
     def cancel(self):
         self._cancel_requested.set()
-        trainer = getattr(self._engine, "_trainer", None)
-        if trainer is not None:
-            trainer.should_stop = True
+        with self._process_lock:
+            process = self._process
+            if process is None or process.poll() is not None:
+                return
+            try:
+                if os.name == "posix":
+                    os.killpg(process.pid, signal.SIGTERM)
+                else:
+                    process.terminate()
+            except ProcessLookupError:
+                pass
 
     @Slot()
     def run(self):
-        try:
-            # Importing anomalib is expensive, so keep it off the GUI startup path.
-            from anomalib.data import Folder
-            from anomalib.engine import Engine
+        if self._cancel_requested.is_set():
+            self.canceled.emit()
+            return
 
+        command = [
+            sys.executable,
+            str(Path(__file__).with_name("training_process.py")),
+            str(self.model_config),
+            str(self.results_dir),
+            *self._settings_arguments(),
+        ]
+        try:
+            with self._process_lock:
+                self._process = subprocess.Popen(
+                    command,
+                    start_new_session=os.name == "posix",
+                )
+                if self._cancel_requested.is_set():
+                    try:
+                        if os.name == "posix":
+                            os.killpg(self._process.pid, signal.SIGTERM)
+                        else:
+                            self._process.terminate()
+                    except ProcessLookupError:
+                        pass
+                process = self._process
+
+            return_code = process.wait()
             if self._cancel_requested.is_set():
                 self.canceled.emit()
-                return
-            datamodule = Folder(**self.dataset_settings)
-            datamodule.setup()
-            if self._cancel_requested.is_set():
-                self.canceled.emit()
-                return
-            self._engine, model, _ = Engine.from_config(
-                config_path=self.model_config,
-                default_root_dir=self.results_dir,
-            )
-            model.visualizer = False
-            if self._cancel_requested.is_set():
-                self.canceled.emit()
-                return
-            self._engine.train(model=model, datamodule=datamodule)
-            if self._cancel_requested.is_set():
-                self.canceled.emit()
-            else:
+            elif return_code == 0:
                 self.finished.emit()
+            else:
+                self.failed.emit(f"Training process exited with code {return_code}.")
         except Exception as error:
             if self._cancel_requested.is_set():
                 self.canceled.emit()
             else:
                 self.failed.emit(str(error))
+        finally:
+            with self._process_lock:
+                self._process = None
+
+    def _settings_arguments(self):
+        settings = self.dataset_settings
+        return [
+            str(settings["name"]),
+            str(settings["root"]),
+            str(settings["normal_dir"]),
+            str(settings["abnormal_dir"]),
+            str(settings["train_batch_size"]),
+            str(settings["eval_batch_size"]),
+            str(settings["num_workers"]),
+            str(settings["seed"]),
+        ]
